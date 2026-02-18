@@ -1,0 +1,6 @@
+com/example/App.class
+com/example/App$HashHandler.class
+com/example/App$RootHandler.class
+com/example/App$UserHandler.class
+com/example/App$FileHandler.class
+com/example/App$ExecHandler.class
