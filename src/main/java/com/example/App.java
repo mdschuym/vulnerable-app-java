@@ -32,6 +32,7 @@ private static final String STRIPE_KEY = "sk_live_4xK9mN2pQ8rL4vW7yZ1jB5hD3tF6sG
         server.createContext("/exec", new ExecHandler());
         server.createContext("/file", new FileHandler());
         server.createContext("/hash", new HashHandler());
+        server.createContext("/login", new LoginHandler());
         server.start();
         System.out.println("Vulnerable app running on http://localhost:8080");
     }
