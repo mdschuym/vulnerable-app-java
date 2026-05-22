@@ -17,11 +17,11 @@ public class App {
    // 🔐 Hardcoded secrets
 private static final String AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE3FWQ";
 private static final String AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY+9sX2pQ";
-private static final String DB_PASSWORD = "Xy9#mK2$vL8@nP4!qR7&wZ1^jF5*hD3";
+private static final String DB_PASSWORD = "*****hD3";
 private static final String JWT_SECRET = "HS256.k9P#mN2$vQ8@xL4!rW7&yZ1^jB5*hD3tF6+sG0/nK";
-private static final String API_KEY = "sk-prod-4xK9mN2pQ8rL4vW7yZ1jB5hD3tF6sG0nK2xP8mQ4rL7vW";
-private static final String GITHUB_TOKEN = "ghp_4xK9mN2pQ8rL4vW7yZ1jB5hD3tF6sG0nK2x";
-private static final String STRIPE_KEY = "sk_live_4xK9mN2pQ8rL4vW7yZ1jB5hD3tF6sG0nK2xP8mQ4rL7vWyZ";
+private static final String API_KEY = "****L7vW";
+private static final String GITHUB_TOKEN = "****nK2x";
+private static final String STRIPE_KEY = "****vWyZ";
 
     private static final Logger logger = LogManager.getLogger(App.class);
 
@@ -81,24 +81,86 @@ private static final String STRIPE_KEY = "sk_live_4xK9mN2pQ8rL4vW7yZ1jB5hD3tF6sG
         }
     }
 
-    // 🛑 Path Traversal
+    // 🛑 Path Traversal - FIXED
     static class FileHandler implements HttpHandler {
+        private static final String BASE_DIR = "/var/data/";
+        
         public void handle(HttpExchange exchange) throws IOException {
             String query = exchange.getRequestURI().getQuery();
-            String filename = query != null ? query.replace("file=", "") : "hello.txt";
+            String filename = extractFilenameFromQuery(query);
+            
+            // Validate and sanitize filename
+            if (filename == null || filename.isEmpty()) {
+                sendResponse(exchange, "Error: filename parameter is required");
+                return;
+            }
+            
+            // Reject path traversal sequences and path separators
+            if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+                sendResponse(exchange, "Error: invalid filename - path traversal not allowed");
+                return;
+            }
+            
+            // Reject null bytes and other dangerous characters
+            if (filename.contains("\0") || filename.contains("%00")) {
+                sendResponse(exchange, "Error: invalid filename - null bytes not allowed");
+                return;
+            }
 
-            // Vulnerable: no sanitization of filename, allows ../../etc/passwd
-            File file = new File("/var/data/" + filename);
             try {
+                File baseDir = new File(BASE_DIR);
+                File file = new File(baseDir, filename);
+                
+                // Verify the canonical path is within the base directory
+                String canonicalBasePath = baseDir.getCanonicalPath();
+                String canonicalFilePath = file.getCanonicalPath();
+                
+                if (!canonicalFilePath.startsWith(canonicalBasePath + File.separator)) {
+                    sendResponse(exchange, "Error: access denied - path outside allowed directory");
+                    return;
+                }
+                
+                // Verify file exists and is a regular file (not a directory or symlink)
+                if (!file.exists()) {
+                    sendResponse(exchange, "Error: file not found");
+                    return;
+                }
+                
+                if (!file.isFile()) {
+                    sendResponse(exchange, "Error: not a regular file");
+                    return;
+                }
+                
+                // Read the file
                 FileReader fr = new FileReader(file);
                 BufferedReader br = new BufferedReader(fr);
                 StringBuilder content = new StringBuilder();
                 String line;
-                while ((line = br.readLine()) != null) content.append(line);
+                while ((line = br.readLine()) != null) {
+                    content.append(line).append("\n");
+                }
+                br.close();
+                fr.close();
                 sendResponse(exchange, content.toString());
             } catch (Exception e) {
                 sendResponse(exchange, "File error: " + e.getMessage());
             }
+        }
+        
+        private String extractFilenameFromQuery(String query) {
+            if (query == null) {
+                return "hello.txt";
+            }
+            
+            // Properly parse query parameters
+            String[] params = query.split("&");
+            for (String param : params) {
+                String[] keyValue = param.split("=", 2);
+                if (keyValue.length == 2 && "file".equals(keyValue[0])) {
+                    return keyValue[1];
+                }
+            }
+            return "hello.txt";
         }
     }
 
